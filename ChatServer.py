@@ -1,6 +1,6 @@
 from loguru import logger
 
-from OneThreadServer import connection_decorator, OneThreadServer
+from OneThreadServer import OneThreadServer
 from config import host, port
 
 
@@ -10,7 +10,7 @@ class ChatServer(OneThreadServer):
         self.users = []
 
     def work(self):
-        self.connect_user()
+        self.users.extend(self.connect_clients())
 
         # --- resending messages ---
         # get messages from all users
@@ -29,36 +29,19 @@ class ChatServer(OneThreadServer):
         sends messages from one user to all other
         """
         logger.debug(f"USER {user.getsockname()} SEND: {msg}")
-        for i in range(len(self.users)-1, -1, -1):
+        for i in range(len(self.users) - 1, -1, -1):
             if self.users[i] != user:
-                self.users[i].send(bytes(msg, encoding="utf-8"))
+                self.send(self.users[i], msg)
 
-                # --- check user is connected ---
-                try:
-                    self.users[i].recv(1)
-                except BlockingIOError:
-                    pass
-                except ConnectionAbortedError:
-                    # if lost connection - disconnect
-                    logger.info(f"USER DISCONNECTED {self.users[i].getsockname()}")
-                    self.users[i].close()
-                    self.users.pop(i)
+    def on_connection_lost(self, conn):
+        super().on_connection_lost(conn)
+        self.users.remove(conn)
 
-    @connection_decorator(default="", is_ignore_abort=True)
     def get_message(self, conn, size=1024):
         """
         receiving a message from a user
         """
-        return conn.recv(size).decode()
-
-    @connection_decorator()
-    def connect_user(self):
-        """
-        connect user to server
-        """
-        conn, _ = self.sock.accept()
-        self.users.append(conn)
-        logger.info(f"USER CONNECTED    {conn.getsockname()}")
+        return self.recv(conn, size)
 
 
 if __name__ == '__main__':

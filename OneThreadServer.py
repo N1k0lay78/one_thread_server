@@ -2,31 +2,6 @@ from socket import socket
 from loguru import logger
 
 
-def connection_decorator(default=None, is_ignore_abort=False, info=""):
-    """
-    decorator for functions working with connections
-    """
-    def decorator(func):
-        def wrapper(self, *args, **kwargs):
-            try:
-                return func(self, *args, **kwargs)
-            except BlockingIOError:
-                pass
-            except ConnectionAbortedError as ex:
-                if is_ignore_abort:
-                    logger.error(f"LOST CONNECTION {info = }")
-                else:
-                    raise ex
-            except ConnectionResetError as ex:
-                if is_ignore_abort:
-                    logger.error(f"USER HIMSELF DISCONNECTED {info = }")
-                else:
-                    raise ex
-            return default
-        return wrapper
-    return decorator
-
-
 class OneThreadServer:
     def __init__(self, host, port):
         self.host = host
@@ -43,7 +18,6 @@ class OneThreadServer:
             self.work()
         self.on_stop()
 
-    @connection_decorator()
     def on_start(self):
         """
         starting the server
@@ -59,7 +33,60 @@ class OneThreadServer:
         """
         pass
 
-    @connection_decorator()
+    def send(self, conn, msg, encoding="utf-8", auto_disconnect=True):
+        """
+        send message to client
+        """
+        conn.send(bytes(msg, encoding))
+        if auto_disconnect:
+            self.recv(conn, size=1, auto_disconnect=True)
+
+    def recv(self, conn, size=1024, encoding="utf-8", auto_disconnect=True, emp_msg="", err_msg=""):
+        """
+        recv message from client
+        """
+        try:
+            return conn.recv(size).decode(encoding)
+        except BlockingIOError:
+            return emp_msg
+        except ConnectionAbortedError:
+            if auto_disconnect:
+                self.on_connection_lost(conn)
+        except ConnectionResetError:
+            if auto_disconnect:
+                self.on_connection_lost(conn)
+        finally:
+            return err_msg
+
+    def on_connection_lost(self, conn):
+        logger.info(f"CLIENT DISCONNECTED {conn.getsockname()}")
+        conn.close()
+
+    def connect_clients(self):
+        connections = []
+        try:
+            while True:
+                connections.append(self.sock.accept()[0])
+                logger.info(f"USER CONNECTED    {connections[-1].getsockname()}")
+        except BlockingIOError:
+            pass
+        return connections
+
+    def client_is_connected(self, conn):
+        """
+        check client is connected
+        """
+        try:
+            conn.recv(1)
+        except BlockingIOError:
+            pass
+        except ConnectionAbortedError:
+            return False
+        except ConnectionResetError:
+            return False
+        finally:
+            return True
+
     def on_stop(self):
         """
         executed when the server is shut down
