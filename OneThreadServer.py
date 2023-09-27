@@ -33,6 +33,13 @@ class OneThreadServer:
         """
         pass
 
+    def on_stop(self):
+        """
+        executed when the server is shut down
+        """
+        self.sock.close()
+        logger.info("SERVER CLOSED")
+
     def send(self, conn, msg, encoding="utf-8", auto_disconnect=True):
         """
         send message to client
@@ -40,6 +47,12 @@ class OneThreadServer:
         conn.send(bytes(msg, encoding))
         if auto_disconnect:
             self.recv(conn, size=1, auto_disconnect=True)
+
+    def ping(self, conn, msg="ping", auto_disconnect=True):
+        """
+        ping client
+        """
+        self.send(conn, msg, auto_disconnect=auto_disconnect)
 
     def recv(self, conn, size=1024, encoding="utf-8", auto_disconnect=True, emp_msg="", err_msg=""):
         """
@@ -67,7 +80,7 @@ class OneThreadServer:
         try:
             while True:
                 connections.append(self.sock.accept()[0])
-                logger.info(f"USER CONNECTED    {connections[-1].getsockname()}")
+                logger.info(f"CLIENT CONNECTED    {connections[-1].getsockname()}")
         except BlockingIOError:
             pass
         return connections
@@ -86,13 +99,6 @@ class OneThreadServer:
             return False
         finally:
             return True
-
-    def on_stop(self):
-        """
-        executed when the server is shut down
-        """
-        self.sock.close()
-        logger.info("SERVER CLOSED")
 
     def stop(self):
         """

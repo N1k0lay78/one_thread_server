@@ -20,6 +20,11 @@ class TicTacToeServer(OneThreadServer):
         # connecting players and generate games
         self.connect_players()
 
+        # recv
+        for conn in self.players:
+            self.recv(conn)
+            self.ping(conn)
+
     # --- server work ---
 
     def connect_players(self):
