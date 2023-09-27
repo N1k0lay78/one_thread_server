@@ -40,7 +40,7 @@ class TicTacToeServer(OneThreadServer):
         msg = super().recv(conn, size, encoding, auto_disconnect, emp_msg, err_msg)
         # action move
         if msg.startswith("move") and len(msg.split()) == 3:
-            _, x, y = msg.split()
+            x, y = msg.split()[1:]
             game = self.get_game(conn)
             if game and x.isdigit() and y.isdigit():
                 self.check_move(conn, int(x), int(y), game)
@@ -70,16 +70,16 @@ class TicTacToeServer(OneThreadServer):
         checking winner of the game
         """
         t = 2 if pl == game[0] else 1
-        if game.make_step(t, x, y):
-            win = game.check_win()
-            if not win:
-                self.send_board(game)
-            else:
-                self.send(game[0], "win" if win == 2 else "lose")
-                self.send(game[1], "win" if win == 1 else "lose")
-                self.close_game(game)
+
+        game.make_step(t, x, y)
+
+        win = game.check_win()
+        if not win:
+            self.send_board(game)
         else:
-            self.send(pl, "cmst")  # can't make step
+            self.send(game[0], "win" if win == 2 else "lose")
+            self.send(game[1], "win" if win == 1 else "lose")
+            self.close_game(game)
 
     def generate_games(self):
         """
@@ -118,6 +118,8 @@ class TicTacToeServer(OneThreadServer):
         self.send(pl_x, f"board {game_logic.get_board()}")
 
     def close_game(self, game):
+        self.send(game[0], "end")
+        self.send(game[1], "end")
         self.games.remove(game)
 
 

@@ -16,7 +16,7 @@ class TicTacToeGameLogic:
         """
         return board inline string
         """
-        return "".join(map(lambda x: "".join(map(str, x)), self.board))
+        return str(self.get_step()) + " " + "".join(map(lambda x: "".join(map(str, x)), self.board))
 
     def make_step(self, player, x, y):
         """
