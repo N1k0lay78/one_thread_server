@@ -34,13 +34,9 @@ class TicTacToeGame:
 
         # --- connect to server ---
         self.client = TicTacToeClient(host_port)
+        self.client.start()
 
         # --- game board ---
-        # TODO:
-        # server chose ur type
-        self.game_board = [[0 for x in range(self.board_size[0])] for y in range(self.board_size[1])]
-        self.type = 2  # 1 if input("chose X or O: ").lower() == "x" else 2
-        self.step_type = 2
         self.mouse_press_cell = (-1, -1)
 
         # --- start game ---
@@ -49,6 +45,10 @@ class TicTacToeGame:
 
     def run(self):
         while self.running:
+            self.client.update()
+            game_board = self.client.get_board()
+            tp = self.client.get_type()
+            step = self.client.get_step()
             # --- events ---
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -73,8 +73,8 @@ class TicTacToeGame:
                     if event.button == 1:
                         cell = (event.pos[0] // self.tile_size[0],
                                 self.board_size[1] - event.pos[1] // self.tile_size[1] - 1)
-                        if cell == self.mouse_press_cell:
-                            self.game_board[cell[1]][cell[0]] = self.type
+                        if cell == self.mouse_press_cell and tp == step:
+                            self.client.send_move(*cell)
                         self.mouse_press_cell = (-1, -1)
 
             # --- draw background ---
@@ -83,14 +83,15 @@ class TicTacToeGame:
                     self.draw(self.tile_set[0], x, y)
 
             # --- draw board ---
-            for y in range(self.board_size[1] - 1, -1, -1):  # from top to bottom
-                for x in range(self.board_size[0]):
-                    if self.game_board[y][x]:
-                        self.draw(self.tile_set[self.game_board[y][x]], x, y)
+            for y in range(2, -1, -1):  # from top to bottom
+                for x in range(3):
+                    if game_board[y][x]:
+                        self.draw(self.tile_set[game_board[y][x]], x, y)
 
             # --- update screen and control fps ---
             pg.display.update()
             self.clock.tick(self.FPS)
+        self.client.stop()
 
     def draw(self, surface, x, y):
         self.screen.blit(surface, (self.tile_size[0] * x,

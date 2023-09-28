@@ -9,12 +9,16 @@ class TicTacToeClient(OneThreadClient):
         self.board = [[0 for _ in range(3)] for _ in range(3)]
         self.type = 0
         self.step = 1
+        self.buffer = ""
 
     def send_move(self, x, y):
         self.send(f"move {x} {y}")
 
     def update(self):
-        msg = self.recv()
+        self.recv()
+
+        msg = self.get_msg()
+
         if msg == "win":
             print("WIN")
         elif msg == "lose":
@@ -22,13 +26,12 @@ class TicTacToeClient(OneThreadClient):
         elif msg.startswith("type"):
             self.type = int(msg.split()[1])
             self.at_game = True
-            print("start game")
         elif msg.startswith("board"):
             st, bo = msg.split()[1:]
             self.step = int(st)
+            self.load_board(bo)
         elif msg == "end":
             self.at_game = False
-            print("end game")
 
     def is_at_game(self):
         return self.is_at_game()

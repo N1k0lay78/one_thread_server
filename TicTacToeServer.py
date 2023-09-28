@@ -15,6 +15,7 @@ class TicTacToeServer(OneThreadServer):
         self.players = []
         self.games = []
         self.time = 0
+        self.time_ping = 0
 
     def work(self):
         # connecting players and generate games
@@ -23,7 +24,11 @@ class TicTacToeServer(OneThreadServer):
         # recv
         for conn in self.players:
             self.recv(conn)
-            self.ping(conn)
+            self.update(conn)
+        if time() - self.time_ping > 5:
+            for conn in self.players:
+                self.ping(conn)
+                self.time_ping = time()
 
     # --- server work ---
 
@@ -32,12 +37,12 @@ class TicTacToeServer(OneThreadServer):
         connecting players and create games
         """
         self.players.extend(self.connect_clients())
-        if time() - self.time >= 60 and len(self.players) > 1:  # one minute and 2+ players
+        if len(self.players) > 1 and (time() - self.time >= 60 or len(self.games) == 0):  # one minute and 2+ players
             self.generate_games()
             self.time = time()
 
-    def recv(self, conn, size=1024, encoding="utf-8", auto_disconnect=True, emp_msg="", err_msg=""):
-        msg = super().recv(conn, size, encoding, auto_disconnect, emp_msg, err_msg)
+    def update(self, conn):
+        msg = self.get_msg(conn)
         # action move
         if msg.startswith("move") and len(msg.split()) == 3:
             x, y = msg.split()[1:]
@@ -48,7 +53,8 @@ class TicTacToeServer(OneThreadServer):
     def on_connection_lost(self, conn):
         super().on_connection_lost(conn)
         # remove players from players list
-        self.players.remove(conn)
+        if conn in self.players:
+            self.players.remove(conn)
         game = self.get_game(conn)
         # close game
         if game:
@@ -71,12 +77,13 @@ class TicTacToeServer(OneThreadServer):
         """
         t = 2 if pl == game[0] else 1
 
-        game.make_step(t, x, y)
+        game[-1].make_step(t, x, y)
 
-        win = game.check_win()
+        win = game[-1].check_win()
         if not win:
             self.send_board(game)
         else:
+            self.send_board(game)
             self.send(game[0], "win" if win == 2 else "lose")
             self.send(game[1], "win" if win == 1 else "lose")
             self.close_game(game)
@@ -92,6 +99,7 @@ class TicTacToeServer(OneThreadServer):
             # creating game and send types and board to players
             self.generate_game(*players[:2])
             players = players[2:]
+        logger.info(f"CONNECTED {len(self.players)} PLAYERS, CREATED {len(self.games)} GAMES")
 
     def generate_game(self, pl_o, pl_x):
         """
@@ -105,7 +113,7 @@ class TicTacToeServer(OneThreadServer):
         """
         sending types to players
         """
-        pl_o, pl_x, game_logic = game
+        pl_o, pl_x, _ = game
         self.send(pl_o, "type 2")
         self.send(pl_x, "type 1")
 
@@ -118,9 +126,14 @@ class TicTacToeServer(OneThreadServer):
         self.send(pl_x, f"board {game_logic.get_board()}")
 
     def close_game(self, game):
-        self.send(game[0], "end")
-        self.send(game[1], "end")
-        self.games.remove(game)
+        if game[0] in self.buffers:
+            self.send(game[0], "end")
+            self.send(game[0], f"board {TicTacToeGameLogic().get_board()}")
+        if game[1] in self.buffers:
+            self.send(game[1], "end")
+            self.send(game[1], f"board {TicTacToeGameLogic().get_board()}")
+        if game in self.games:
+            self.games.remove(game)
 
 
 if __name__ == '__main__':
