@@ -10,6 +10,8 @@ class OneThreadClient:
         self.__running = True
         self.host_port = host_port
         self.pint_msg = "ping"
+        self.buffer = ""
+        self.separator = "\t"
 
     def start(self):
         """
@@ -29,31 +31,41 @@ class OneThreadClient:
         """
         send message to server
         """
-        self.conn.send(bytes(msg, encoding))
+        self.conn.send(bytes(msg+self.separator, encoding))
         if auto_disconnect:
             self.recv(size=1, auto_disconnect=True)
 
-    def recv(self, size=1024, encoding="utf-8", auto_disconnect=True, emp_msg="", err_msg=""):
+    def recv(self, size=1024, encoding="utf-8", auto_disconnect=True):
         """
         recv message from server
         """
         try:
-            msg = self.conn.recv(size).decode(encoding)
-            if msg != self.pint_msg:
-                return msg
-            return ""
+            self.buffer += self.conn.recv(size).decode(encoding)
+            self.buffer.replace(f"{self.pint_msg}{self.separator}", "")
         except BlockingIOError:
-            return emp_msg
+            pass
         except ConnectionAbortedError:
             if auto_disconnect:
                 self.on_connection_lost()
         except ConnectionResetError:
             if auto_disconnect:
                 self.on_connection_lost()
-        finally:
-            return err_msg
+
+    def get_msg(self, emp_msg=""):
+        """
+        return first message from buffer
+        """
+        msgs = self.buffer.split(self.separator)
+        if len(msgs) > 1:
+            msg = msgs[0]
+            self.buffer = self.separator.join(msgs[1:])
+            return msg
+        return emp_msg
 
     def on_connection_lost(self):
+        """
+        execute when lost connection with server
+        """
         logger.info(f"DISCONNECTED {self.conn.getsockname()}")
         self.conn.close()
 
