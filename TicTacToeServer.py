@@ -5,6 +5,7 @@ from OneThreadServer import OneThreadServer
 from TicTacToeGameLogic import TicTacToeGameLogic
 from config import host, port
 
+
 # TODO:
 # сделать человек или бот AI
 
@@ -26,9 +27,7 @@ class TicTacToeServer(OneThreadServer):
             self.recv(conn)
             self.update(conn)
         if time() - self.time_ping > 5:
-            for conn in self.players:
-                self.ping(conn)
-                self.time_ping = time()
+            self.ping_everyone()
 
     # --- server work ---
 
@@ -38,8 +37,15 @@ class TicTacToeServer(OneThreadServer):
         """
         self.players.extend(self.connect_clients())
         if len(self.players) > 1 and (time() - self.time >= 60 or len(self.games) == 0):  # one minute and 2+ players
-            self.generate_games()
-            self.time = time()
+            self.ping_everyone()
+            if len(self.players) > 1:
+                self.generate_games()
+                self.time = time()
+
+    def ping_everyone(self):
+        for conn in self.players:
+            self.ping(conn)
+            self.time_ping = time()
 
     def update(self, conn):
         msg = self.get_msg(conn)
@@ -106,6 +112,7 @@ class TicTacToeServer(OneThreadServer):
         creating game and send types and board to players
         """
         self.games.append([pl_o, pl_x, TicTacToeGameLogic()])
+        print(self.games, "DSADASDA")
         self.send_type(self.games[-1])
         self.send_board(self.games[-1])
 

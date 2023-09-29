@@ -10,11 +10,15 @@ class TicTacToeClient(OneThreadClient):
         self.type = 0
         self.step = 1
         self.buffer = ""
+        self.ping_delta = 12
+        self.ping_time = 0
 
     def send_move(self, x, y):
         self.send(f"move {x} {y}")
 
     def update(self):
+        super().update()
+
         self.recv()
 
         msg = self.get_msg()
